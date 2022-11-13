@@ -81,6 +81,10 @@ double angle_between_points(double x1, double y1, double x2, double y2){
   return atan2(y2-y1, x2-x1);
 }
 
+double sqrd_distance_between_points(double x1, double y1, double x2, double y2){
+  return pow((x1 - x2), 2) + pow((y1 - y2), 2);
+}
+
 BehaviorPlannerFSM behavior_planner(
       P_LOOKAHEAD_TIME, P_LOOKAHEAD_MIN, P_LOOKAHEAD_MAX, P_SPEED_LIMIT,
       P_STOP_THRESHOLD_SPEED, P_REQ_STOPPED_TIME, P_REACTION_TIME,
@@ -226,7 +230,9 @@ int main ()
   **/
 
   PID pid_steer = PID();
+
   PID pid_throttle = PID();
+  pid_throttle.Init(0.25, 0.001, 0.02, 1.0, -1.0);
 
   h.onMessage([&pid_steer, &pid_throttle, &new_delta_time, &timer, &prev_timer, &i, &prev_timer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode)
   {
@@ -325,8 +331,8 @@ int main ()
           /**
           * TODO (step 2): uncomment these lines
           **/
-//           // Update the delta time with the previous command
-//           pid_throttle.UpdateDeltaTime(new_delta_time);
+          // Update the delta time with the previous command
+          pid_throttle.UpdateDeltaTime(new_delta_time);
 
           // Compute error of speed
           double error_throttle;
@@ -334,8 +340,18 @@ int main ()
           * TODO (step 2): compute the throttle error (error_throttle) from the position and the desired speed
           **/
           // modify the following line for step 2
-          error_throttle = 0;
 
+          // Compute the closest point to the ego car in the planned Path, to then lookup the desired velocity at that point
+          double min_dist = std::numeric_limits<double>::max();
+          int closest_idx_on_path = 0;
+          for (int i = 0; i < x_points.size(); ++i) {
+            auto i_dist = sqrd_distance_between_points(x_position, y_position, x_points[i], y_points[i]);
+            if (i_dist < min_dist) {
+              closest_idx_on_path = i;
+            }
+          }
+
+          error_throttle =  v_points[closest_idx_on_path] - velocity;
 
 
           double throttle_output;
@@ -344,28 +360,28 @@ int main ()
           /**
           * TODO (step 2): uncomment these lines
           **/
-//           // Compute control to apply
-//           pid_throttle.UpdateError(error_throttle);
-//           double throttle = pid_throttle.TotalError();
+          // Compute control to apply
+          pid_throttle.UpdateError(error_throttle);
+          double throttle = pid_throttle.TotalError();
 
-//           // Adapt the negative throttle to break
-//           if (throttle > 0.0) {
-//             throttle_output = throttle;
-//             brake_output = 0;
-//           } else {
-//             throttle_output = 0;
-//             brake_output = -throttle;
-//           }
+          // Adapt the negative throttle to break
+          if (throttle > 0.0) {
+            throttle_output = throttle;
+            brake_output = 0;
+          } else {
+            throttle_output = 0;
+            brake_output = -throttle;
+          }
 
-//           // Save data
-//           file_throttle.seekg(std::ios::beg);
-//           for(int j=0; j < i - 1; ++j){
-//               file_throttle.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-//           }
-//           file_throttle  << i ;
-//           file_throttle  << " " << error_throttle;
-//           file_throttle  << " " << brake_output;
-//           file_throttle  << " " << throttle_output << endl;
+          // Save data
+          file_throttle.seekg(std::ios::beg);
+          for(int j=0; j < i - 1; ++j){
+              file_throttle.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+          }
+          file_throttle  << i ;
+          file_throttle  << " " << error_throttle;
+          file_throttle  << " " << brake_output;
+          file_throttle  << " " << throttle_output << endl;
 
 
           // Send control
