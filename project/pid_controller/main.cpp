@@ -238,12 +238,10 @@ int main ()
   **/
 
   PID pid_steer = PID();
-  // pid_steer.Init(0.4, 0.0002, 0.3, 1.2, -1.2);
-  pid_steer.Init(0.38, 0.29, 0.19, 1.2, -1.2);
+  pid_steer.Init(0.1, 0.0005, 0.02, 1.2, -1.2); 
 
   PID pid_throttle = PID();
-  // pid_throttle.Init(0.25, 0.001, 0.02, 1.0, -1.0);
-  pid_throttle.Init(0.38, 0.0005, 0.3, 1.0, -1.0);
+  pid_throttle.Init(0.21, 0.001, 0.005, 1.0, -1.0); 
 
   h.onMessage([&pid_steer, &pid_throttle, &new_delta_time, &timer, &prev_timer, &i, &prev_timer](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode)
   {
@@ -290,11 +288,7 @@ int main ()
           vector< vector<double> > spirals_y;
           vector< vector<double> > spirals_v;
           vector<int> best_spirals;
-          std::cout << "before path planner: x_points" << std::endl;
-          print(x_points);
           path_planner(x_points, y_points, v_points, yaw, velocity, goal, is_junction, tl_state, spirals_x, spirals_y, spirals_v, best_spirals);
-          std::cout << "after path planner: x_points" << std::endl;
-          print(x_points);
 
           // Save time and compute delta time
           time(&timer);
@@ -303,15 +297,15 @@ int main ()
 
           // Compute the closest point to the ego car in the planned Path, to then lookup the desired velocity at that point
           double min_dist = std::numeric_limits<double>::max();
-          int closest_idx_on_path = 0;
-          std::cout << x_position << ", " <<  y_position <<  ", " << velocity << std::endl;
-          for (int i = 0; i < x_points.size(); ++i) {
-            std::cout << "i=" << i << ", " << x_points[i] << ", " <<  y_points[i] << ", " << v_points[i] << std::endl;
-            auto i_dist = sqrd_distance_between_points(x_position, y_position, x_points[i], y_points[i]);
-            if (i_dist < min_dist) {
-              min_dist = i_dist;
-              std::cout << "close idx =" << closest_idx_on_path << std::endl;
-              closest_idx_on_path = i;
+          int closest_idx_on_path = x_points.size() - 1;
+          
+          for (int k = 0; k < x_points.size(); ++k) {
+            auto k_dist = sqrd_distance_between_points(x_position, y_position, x_points[k], y_points[k]);
+            // find the closest point on path, which is in front from ego car
+            if (k_dist < min_dist  && x_points[k] >= x_position) {
+              min_dist = k_dist;
+              closest_idx_on_path = k;
+              //std::cout << "close idx =" << closest_idx_on_path << std::endl;
             }
           }
 
@@ -332,7 +326,8 @@ int main ()
           /**
           * TODO (step 3): compute the steer error (error_steer) from the position and the desired trajectory
           **/
-          error_steer = angle_between_points(x_position, y_position, x_points[closest_idx_on_path], y_points[closest_idx_on_path])- yaw;
+          double desired_yaw = angle_between_points(x_position, y_position, x_points[closest_idx_on_path], y_points[closest_idx_on_path]);
+          error_steer = (desired_yaw)- (yaw);
 
           /**
           * TODO (step 3): uncomment these lines
@@ -367,9 +362,8 @@ int main ()
           **/
           // modify the following line for step 2
 
-
-
           error_throttle =  v_points[closest_idx_on_path] - velocity;
+          // error_throttle =  v_points[v_points.size()-1] - velocity;
 
 
           double throttle_output;

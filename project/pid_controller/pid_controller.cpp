@@ -42,13 +42,13 @@ void PID::UpdateError(double cte) {
 
    p_error = cte;
 
-   if (dt > 0.0) {
+   if (dt > 0) {
       d_error = (cte - prev_cte) / dt;
    } else {
       d_error = 0.0;
    }
 
-   i_error = i_error + (cte * dt);
+   i_error += (cte * dt);
 }
 
 double PID::TotalError() {
